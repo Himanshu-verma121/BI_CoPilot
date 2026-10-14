@@ -4,10 +4,15 @@ from config import settings
 from models.models import Base
 
 
-engine = create_engine(
+from sqlalchemy import create_engine
+
+if settings.DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(
     settings.DATABASE_URL,
-    connect_args={"check_same_thread": False} 
+    connect_args={"check_same_thread": False}
 )
+else:
+    engine = create_engine(settings.DATABASE_URL)
 
 SessionLocal = sessionmaker(
     autocommit=False,

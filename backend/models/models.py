@@ -8,7 +8,6 @@ Base = declarative_base()
 
 
 # Company Table 
-# Every company that signs up gets one row here
 class Company(Base):
     __tablename__ = "companies"
 
@@ -87,3 +86,26 @@ class Conversation(Base):
 
     company       = relationship("Company", back_populates="conversations")
     user          = relationship("User", back_populates="conversations")
+
+
+# Alerts 
+class Alert(Base):
+    __tablename__ = "alerts"
+
+    id                  = Column(Integer, primary_key=True, index=True)
+    company_id          = Column(Integer, ForeignKey("companies.id"))
+
+    kpi_name            = Column(String(100))
+
+    current_value       = Column(String(50))
+    historical_value    = Column(String(50))
+    pct_change          = Column(String(20))
+
+    severity            = Column(String(20))
+
+    message             = Column(Text)
+    possible_causes     = Column(Text)    
+    recommended_action  = Column(Text)
+
+    is_read             = Column(Boolean, default=False)
+    created_at          = Column(DateTime, default=datetime.utcnow)
