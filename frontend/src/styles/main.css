@@ -446,3 +446,290 @@ body {
     color     : var(--text-secondary);
     margin-top: 4px;
 }
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    overflow-y: auto;
+    background: rgba(3, 7, 18, 0.78);
+    backdrop-filter: blur(7px);
+}
+
+.connect-modal {
+    width: 100%;
+    max-width: 540px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-sizing: border-box;
+    padding: 26px;
+    border: 1px solid #293650;
+    border-radius: 18px;
+    background: #0b1020;
+    color: #f4f7ff;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+}
+
+.connect-modal .modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.connect-modal-title {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.connect-modal-icon,
+.security-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border-radius: 12px;
+    background: #202f53;
+    color: #9db1ff;
+}
+
+.connect-modal-icon {
+    width: 50px;
+    height: 50px;
+}
+
+.connect-modal-title h2 {
+    margin: 0 0 6px;
+    color: #f4f7ff;
+    font-size: 21px;
+}
+
+.connect-modal-title p {
+    margin: 0;
+    color: #9caac4;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.connect-modal .modal-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid #35425c;
+    border-radius: 9px;
+    background: transparent;
+    color: #aebbd2;
+    cursor: pointer;
+}
+
+.connect-modal .modal-close:hover {
+    background: #202c43;
+    color: #fff;
+}
+
+.connect-modal .connect-form-section h3 {
+    margin: 0 0 20px;
+    color: #aab8d2;
+    font-size: 11px;
+    letter-spacing: 1.3px;
+}
+
+.connect-modal form {
+    display: flex;
+    flex-direction: column;
+}
+
+.connect-modal label {
+    display: block;
+    margin: 15px 0 8px;
+    color: #dce5f8;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.connect-modal input,
+.connect-modal select {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 12px 13px;
+    border: 1px solid #35425c;
+    border-radius: 9px;
+    outline: none;
+    background: #111a2e;
+    color: #f4f7ff;
+    font: inherit;
+    font-size: 13px;
+}
+
+.connect-modal input::placeholder {
+    color: #8291ad;
+}
+
+.connect-modal input:focus,
+.connect-modal select:focus {
+    border-color: #819bff;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+}
+
+.database-type-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.database-type-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 82px;
+    padding: 12px 6px;
+    border: 1px solid #35425c;
+    border-radius: 10px;
+    background: #111a2e;
+    color: #b6c2d8;
+    cursor: pointer;
+}
+
+.database-type-option:hover {
+    border-color: #819bff;
+    color: #fff;
+}
+
+.database-type-option.active {
+    border-color: #819bff;
+    background: #202f53;
+    color: #b9c7ff;
+}
+
+.database-type-option span {
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.connect-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.connect-form-grid > div {
+    min-width: 0;
+}
+
+.connect-security-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-top: 22px;
+    padding: 14px;
+    border: 1px solid #293b5b;
+    border-radius: 11px;
+    background: #121e35;
+}
+
+.security-icon {
+    width: 32px;
+    height: 32px;
+}
+
+.connect-security-note strong {
+    display: block;
+    margin-bottom: 5px;
+    color: #dce5f8;
+    font-size: 12px;
+}
+
+.connect-security-note p {
+    margin: 0;
+    color: #96a7c4;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.connect-modal .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 24px;
+    padding-top: 18px;
+    border-top: 1px solid #293650;
+}
+
+.connect-cancel-btn,
+.connect-submit-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 42px;
+    padding: 10px 16px;
+    border-radius: 9px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.connect-cancel-btn {
+    border: 1px solid #3a4760;
+    background: transparent;
+    color: #dce5f8;
+}
+
+.connect-submit-btn {
+    border: 1px solid #667eea;
+    background: #667eea;
+    color: #fff;
+}
+
+.connect-submit-btn:hover:not(:disabled) {
+    background: #586bd0;
+}
+
+.connect-cancel-btn:disabled,
+.connect-submit-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+@media (max-width: 520px) {
+    .connect-modal {
+        padding: 18px;
+    }
+
+    .connect-modal-title h2 {
+        font-size: 18px;
+    }
+
+    .connect-form-grid {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+    .database-type-options {
+        gap: 6px;
+    }
+
+    .database-type-option {
+        min-height: 74px;
+    }
+
+    .database-type-option span {
+        font-size: 11px;
+    }
+
+    .connect-modal .modal-actions > button {
+        flex: 1;
+    }
+}

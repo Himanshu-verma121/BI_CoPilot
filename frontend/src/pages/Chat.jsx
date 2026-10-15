@@ -4,7 +4,8 @@ import { connectionAPI, queryAPI } from "../services/api";
 import ChartDisplay  from "../components/ChartDisplay";
 import LoadingDots   from "../components/LoadingDots";
 import toast, { Toaster } from "react-hot-toast";
-import { Send, Database, Code } from "lucide-react";
+import { Send, Database, Code, Plus, X } from "lucide-react";
+import "../styles/main.css";
 
 const Chat = () => {
     const { user, logout } = useAuth();
@@ -27,6 +28,20 @@ const Chat = () => {
     // showSQL: toggle to show/hide SQL query in message
     const [showSQL,      setShowSQL]      = useState({});
 
+    
+    const [showConnectModal, setShowConnectModal] = useState(false);
+    const [connecting, setConnecting] = useState(false);
+
+    const [connectionForm, setConnectionForm] = useState({
+        name: "",
+        db_type: "postgresql",
+        host: "",
+        port: "5432",
+        username: "",
+        password: "",
+        db_name: ""
+    });
+
     // messagesEnd: ref to scroll to bottom of messages
     const messagesEnd = useRef(null);
 
@@ -43,7 +58,7 @@ const Chat = () => {
     const loadConnections = async () => {
         try {
             const response = await connectionAPI.list();
-            const conns    = response.data.connections;
+            const conns    = response.data.connections || [];
             setConnections(conns);
 
             // Auto select first connection if exists
@@ -108,6 +123,54 @@ const Chat = () => {
         }
     };
 
+    
+    const handleConnectDatabase = async (e) => {
+        e.preventDefault();
+        setConnecting(true);
+
+        try {
+            await connectionAPI.add({
+                ...connectionForm,
+                port: connectionForm.db_type === "sqlite"
+                    ? null
+                    : Number(connectionForm.port)
+            });
+
+            const response = await connectionAPI.list();
+            const updatedConnections = response.data.connections || [];
+
+            setConnections(updatedConnections);
+
+            const newConnection = updatedConnections.find(
+                conn => conn.name === connectionForm.name
+            );
+
+            if (newConnection) {
+                setSelectedConn(newConnection);
+            }
+
+            setShowConnectModal(false);
+            setConnectionForm({
+                name: "",
+                db_type: "postgresql",
+                host: "",
+                port: "5432",
+                username: "",
+                password: "",
+                db_name: ""
+            });
+
+            toast.success("Database connected successfully!");
+        } catch (error) {
+            toast.error(
+                error.response?.data?.detail ||
+                "Unable to connect to database."
+            );
+        } finally {
+            setConnecting(false);
+        }
+    };
+    
     // Enter Key 
     // Enter sends message
     // Shift+Enter adds new line
@@ -180,9 +243,9 @@ const Chat = () => {
                         value    = {selectedConn?.id || ""}
                         onChange = {(e) => {
                             const conn = connections.find(
-                                c => c.id === parseInt(e.target.value)
+                                c => String(c.id) === (e.target.value)
                             );
-                            setSelectedConn(conn);
+                            setSelectedConn(conn || null);
                         }}
                         style={{
                             background  : "rgba(255,255,255,0.06)",
@@ -206,6 +269,16 @@ const Chat = () => {
                         )}
                     </select>
                 </div>
+                 
+                <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => setShowConnectModal(true)}
+                    style={{ padding: "8px 12px", fontSize: "12px" }}
+                >
+                    <Plus size={15} />
+                    Connect Database
+                </button>
 
                 {/* User info + Logout */}
                 <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px" }}>
@@ -323,8 +396,253 @@ const Chat = () => {
                     <Send size={16} />
                 </button>
             </div>
-        </div>
-    );
-};
+
+            {/* Connect Database Modal */}
+            {showConnectModal && (
+                <div
+                    className="modal-overlay"
+                    onClick={() => {
+                        if (!connecting) {
+                            setShowConnectModal(false);
+                        }
+                    }}
+                >
+                    <div
+                        className="modal-content connect-modal"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="modal-header">
+                            <div className="connect-modal-title">
+                                <div className="connect-modal-icon">
+                                    <Database size={24} />
+                                </div>
+
+                                <div>
+                                    <h2>Connect a database</h2>
+                                    <p>Bring your company's data into BI_CoPilot.</p>
+                                </div>
+                            </div>
+
+                            <button
+                                type="button"
+                                className="modal-close"
+                                onClick={() => setShowConnectModal(false)}
+                                disabled={connecting}
+                                aria-label="Close modal"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleConnectDatabase}>
+                            <div className="connect-form-section">
+                                <h3>CONNECTION DETAILS</h3>
+
+                                <label htmlFor="connection-name">
+                                    Connection name
+                                </label>
+                                <input
+                                    id="connection-name"
+                                    type="text"
+                                    required
+                                    value={connectionForm.name}
+                                    onChange={(e) =>
+                                        setConnectionForm((prev) => ({
+                                            ...prev,
+                                            name: e.target.value
+                                        }))
+                                    }
+                                    placeholder="e.g. Production Database"
+                                />
+
+                                <label>Database type</label>
+                                <div className="database-type-options">
+                                    {[
+                                        { value: "postgresql", label: "PostgreSQL" },
+                                        { value: "mysql", label: "MySQL" },
+                                        { value: "sqlite", label: "SQLite" }
+                                    ].map((type) => (
+                                        <button
+                                            key={type.value}
+                                            type="button"
+                                            className={`database-type-option ${
+                                                connectionForm.db_type === type.value
+                                                    ? "active"
+                                                    : ""
+                                            }`}
+                                            onClick={() =>
+                                                setConnectionForm((prev) => ({
+                                                    ...prev,
+                                                    db_type: type.value,
+                                                    port:
+                                                        type.value === "mysql"
+                                                            ? "3306"
+                                                            : type.value === "postgresql"
+                                                            ? "5432"
+                                                            : ""
+                                                }))
+                                            }
+                                        >
+                                            <Database size={19} />
+                                            <span>{type.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {connectionForm.db_type !== "sqlite" && (
+                                    <>
+                                        <div className="connect-form-grid">
+                                            <div>
+                                                <label htmlFor="connection-host">
+                                                    Host
+                                                </label>
+                                                <input
+                                                    id="connection-host"
+                                                    type="text"
+                                                    required
+                                                    value={connectionForm.host}
+                                                    onChange={(e) =>
+                                                        setConnectionForm((prev) => ({
+                                                            ...prev,
+                                                            host: e.target.value
+                                                        }))
+                                                    }
+                                                    placeholder="db.company.com"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label htmlFor="connection-port">
+                                                    Port
+                                                </label>
+                                                <input
+                                                    id="connection-port"
+                                                    type="number"
+                                                    min="1"
+                                                    max="65535"
+                                                    required
+                                                    value={connectionForm.port}
+                                                    onChange={(e) =>
+                                                        setConnectionForm((prev) => ({
+                                                            ...prev,
+                                                            port: e.target.value
+                                                        }))
+                                                    }
+                                                    placeholder="5432"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="connect-form-grid">
+                                            <div>
+                                                <label htmlFor="connection-username">
+                                                    Username
+                                                </label>
+                                                <input
+                                                    id="connection-username"
+                                                    type="text"
+                                                    required
+                                                    autoComplete="username"
+                                                    value={connectionForm.username}
+                                                    onChange={(e) =>
+                                                        setConnectionForm((prev) => ({
+                                                            ...prev,
+                                                            username: e.target.value
+                                                        }))
+                                                    }
+                                                    placeholder="Database user"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label htmlFor="connection-password">
+                                                    Password
+                                                </label>
+                                                <input
+                                                    id="connection-password"
+                                                    type="password"
+                                                    autoComplete="new-password"
+                                                    value={connectionForm.password}
+                                                    onChange={(e) =>
+                                                        setConnectionForm((prev) => ({
+                                                            ...prev,
+                                                            password: e.target.value
+                                                        }))
+                                                    }
+                                                    placeholder="Database password"
+                                                />
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                <label htmlFor="connection-db-name">
+                                    {connectionForm.db_type === "sqlite"
+                                        ? "SQLite file path"
+                                        : "Database name"}
+                                </label>
+
+                                <input
+                                    id="connection-db-name"
+                                    type="text"
+                                    required
+                                    value={connectionForm.db_name}
+                                    onChange={(e) =>
+                                        setConnectionForm((prev) => ({
+                                            ...prev,
+                                            db_name: e.target.value
+                                        }))
+                                    }
+                                    placeholder={
+                                        connectionForm.db_type === "sqlite"
+                                            ? "./company.db"
+                                            : "company_database"
+                                    }
+                                />
+
+                                <div className="connect-security-note">
+                                    <div className="security-icon">
+                                        <Database size={18} />
+                                    </div>
+
+                                    <div>
+                                        <strong>Connection details</strong>
+                                        <p>
+                                            Your backend will verify the connection
+                                            before it is added.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="modal-actions">
+                                <button
+                                    type="button"
+                                    className="connect-cancel-btn"
+                                    disabled={connecting}
+                                    onClick={() => setShowConnectModal(false)}
+                                >
+                                    Cancel
+                                </button>
+
+                                <button
+                                    type="submit"
+                                    className="connect-submit-btn"
+                                    disabled={connecting}
+                                >
+                                    <Database size={16} />
+                                    {connecting
+                                        ? "Connecting..."
+                                        : "Connect database"}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+                    </div>
+                );
+            };
+
 
 export default Chat;
