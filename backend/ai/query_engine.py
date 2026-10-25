@@ -1,4 +1,5 @@
 from langchain_openai import ChatOpenAI
+from langchain_groq import ChatGroq
 from sqlalchemy import create_engine, text
 import pandas as pd
 import plotly.express as px
@@ -188,14 +189,21 @@ class QueryEngine:
     English question → SQL → Results → Chart → Answer
     """
 
+    # def __init__(self):
+    #     # Initialize LLM
+    #     self.llm = ChatOpenAI(
+    #         api_key     = settings.OPENAI_API_KEY,
+    #         model       = "gpt-4o-mini",
+    #         temperature = 0     
+    #     )
+    #     # Initialize GROQ LLM
     def __init__(self):
-        # Initialize LLM
-        self.llm = ChatOpenAI(
-            api_key     = settings.OPENAI_API_KEY,
-            model       = "gpt-4o-mini",
-            temperature = 0     
-        )
-
+        self.llm = ChatGroq(
+        api_key=settings.GROQ_API_KEY,
+        model="openai/gpt-oss-120b",
+        temperature=0
+    )
+        
     def build_sql_prompt(self, schema_desc: str, question: str, history: list) -> str:
         """
         Build the prompt we send to GPT.

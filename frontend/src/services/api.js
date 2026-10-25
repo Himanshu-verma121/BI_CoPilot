@@ -74,4 +74,12 @@ export const queryAPI = {
     ask: (data) => api.post("/query/ask", data),
 };
 
+// EXPORT API 
+export const exportAPI = {
+    download: (data) =>
+        api.post("/export/download", data, {
+            responseType: "blob",
+        }),
+};
+
 export default api;

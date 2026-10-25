@@ -1,5 +1,6 @@
 from sqlalchemy        import create_engine, text
 from langchain_openai  import ChatOpenAI
+from langchain_groq import ChatGroq
 import pandas          as pd
 from datetime          import datetime, timedelta
 from typing            import List, Dict
@@ -10,10 +11,16 @@ from config            import settings
 class AnomalyDetector:
     def __init__(self):
        
-        self.llm = ChatOpenAI(
-            api_key     = settings.OPENAI_API_KEY,
-            model       = "gpt-4o-mini",
-            temperature = 0.3    
+        # self.llm = ChatOpenAI(
+        #     api_key     = settings.OPENAI_API_KEY,
+        #     model       = "gpt-4o-mini",
+        #     temperature = 0.3    
+        # )
+        
+        self.llm = ChatGroq(
+        api_key=settings.GROQ_API_KEY,
+        model="openai/gpt-oss-120b",
+        temperature=0.3
         )
 
     def calculate_percentage_change(

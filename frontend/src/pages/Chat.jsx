@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth }       from "../context/AuthContext";
-import { connectionAPI, queryAPI } from "../services/api";
+import { connectionAPI, queryAPI, exportAPI } from "../services/api";
 import ChartDisplay  from "../components/ChartDisplay";
 import LoadingDots   from "../components/LoadingDots";
 import toast, { Toaster } from "react-hot-toast";
-import { Send, Database, Code, Plus, X } from "lucide-react";
+import { Send, Database, Code, Plus, X, FileSpreadsheet, FileText } from "lucide-react";
 import "../styles/main.css";
 
 const Chat = () => {
@@ -70,6 +70,52 @@ const Chat = () => {
         }
     };
 
+
+    const handleExport = async (msg, format) => {
+        try {
+            if (!msg.data || msg.data.length === 0) {
+                toast.error("No result data available to export.");
+                return;
+            }
+
+            const response = await exportAPI.download({
+                question: msg.question,
+                answer: msg.content,
+                sql_query: msg.sql || "",
+                data: msg.data,
+                format,
+            });
+
+            const blob = new Blob([response.data], {
+                type:
+                    format === "excel"
+                        ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        : "application/pdf",
+            });
+
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement("a");
+
+            link.href = url;
+            link.download =
+                format === "excel" ? "bi_results.xlsx" : "bi_report.pdf";
+
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+
+            toast.success(
+                `${format === "excel" ? "Excel" : "PDF"} report downloaded`
+            );
+        } catch (error) {
+            toast.error("Export failed. Please try again.");
+            console.error("Export error:", error);
+        }
+    };
+
+
+
     // Send Message 
     const sendMessage = async () => {
         // Validation
@@ -99,14 +145,16 @@ const Chat = () => {
 
             // AI response to messages
             const aiMessage = {
-                id       : Date.now() + 1,
-                type     : "ai",
-                content  : result.error || result.answer,
-                sql      : result.sql,
-                chart    : result.chart,
+                id: Date.now() + 1,
+                type: "ai",
+                question: question,
+                content: result.error || result.answer,
+                sql: result.sql,
+                chart: result.chart,
                 chartType: result.chart_type,
-                rowCount : result.row_count,
-                isError  : !!result.error
+                rowCount: result.row_count,
+                data: result.data || result.rows || [],
+                isError: !!result.error
             };
             setMessages(prev => [...prev, aiMessage]);
 
@@ -353,16 +401,50 @@ const Chat = () => {
                                 )}
 
                                 {/* Chart */}
-                                {msg.chart && (
+                                {msg.type === "ai" && !msg.isError && msg.chart && (
                                     <ChartDisplay
-                                        chartData = {msg.chart}
-                                        chartType = {msg.chartType}
+                                        chartData={msg.chart}
+                                        chartType={msg.chartType}
                                     />
+                                )}
+
+                                {/* Export buttons */}
+                                {msg.type === "ai" && !msg.isError && (
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            gap: "10px",
+                                            marginTop: "12px",
+                                            flexWrap: "wrap",
+                                        }}
+                                    >
+                                        <button
+                                            type="button"
+                                            className="btn btn-ghost"
+                                            onClick={() => handleExport(msg, "excel")}
+                                            disabled={!msg.data || msg.data.length === 0}
+                                            title={!msg.data || msg.data.length === 0 ? "No result data to export" : "Export results to Excel"}
+                                        >
+                                            <FileSpreadsheet size={15} />
+                                            Export Excel
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            className="btn btn-ghost"
+                                            onClick={() => handleExport(msg, "pdf")}
+                                            disabled={!msg.data || msg.data.length === 0}
+                                            title={!msg.data || msg.data.length === 0 ? "No result data to export" : "Export results to PDF"}
+                                        >
+                                            <FileText size={15} />
+                                            Export PDF
+                                        </button>
+                                    </div>
                                 )}
                             </div>
                         </div>
-                    ))
-                )}
+                        ))
+                    )}
 
                 {isLoading && (
                     <div className="message ai">
