@@ -204,7 +204,7 @@ class QueryEngine:
         temperature=0
     )
         
-    def build_sql_prompt(self, schema_desc: str, question: str, history: list) -> str:
+    def build_sql_prompt(self, schema_desc: str, question: str, history: list,   db_type: str) -> str:
         """
         Build the prompt we send to GPT.
         """
@@ -217,6 +217,11 @@ class QueryEngine:
 
         prompt = f"""You are an expert SQL analyst for a Business Intelligence platform.
 Your job is to convert natural language questions into accurate SQL queries.
+
+SELECTED DATABASE TYPE: {db_type}
+
+Generate SQL strictly compatible with this database type.
+Do not use syntax or functions from another database engine.
 
 DATABASE SCHEMA:
 {schema_desc}
@@ -237,12 +242,12 @@ Current Question: {question}
 SQL Query:"""
         return prompt
 
-    def generate_sql(self, question: str, schema: dict, history: list = []) -> str:
+    def generate_sql(self, question: str, schema: dict, db_type: str, history: list = []) -> str:
         """
         Step 1: Convert English question to SQL using GPT.
         """
         schema_desc = get_schema_description(schema)
-        prompt      = self.build_sql_prompt(schema_desc, question, history)
+        prompt      = self.build_sql_prompt(schema_desc, question, history, db_type)
 
         response = self.llm.invoke(prompt)
         sql      = extract_sql_from_response(response.content)
@@ -289,6 +294,7 @@ Be direct and professional."""
         question       : str,
         connection_url : str,
         schema         : dict,
+        db_type : str,
         history        : list = []
     ) -> dict:
         """
@@ -309,7 +315,7 @@ Be direct and professional."""
         try:
             # 1: Generate SQL
             print(f"Generating SQL for: {question}")
-            sql = self.generate_sql(question, schema, history)
+            sql = self.generate_sql(question, schema, db_type, history)
             result["sql"] = sql
             print(f"Generated SQL: {sql}")
 

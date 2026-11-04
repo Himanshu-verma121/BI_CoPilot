@@ -84,7 +84,8 @@ def ask_question(
         question       = data.question,
         connection_url = url,
         schema         = schema,
-        history        = history_list
+        history        = history_list,
+        db_type = connection.db_type
     )
 
     # How long query took in milliseconds
