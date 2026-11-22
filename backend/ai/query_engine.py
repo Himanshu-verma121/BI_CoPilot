@@ -8,27 +8,53 @@ import re
 from config import settings
 
 
-def get_schema_description(schema: dict) -> str:
-    """
-    Converting schema JSON into human readable text for the AI prompt.
-
-    {"orders": {"columns": [{"name": "id"}, {"name": "amount"}]}}
-
-    To this:
-    Table: orders
-      - id (INTEGER)
-      - amount (FLOAT)
-      - customer_id (INTEGER)
-
-    """
+def get_schema_description(schema: dict, db_type: str) -> str:
     description = ""
-    for table_name, table_info in schema.items():
+
+    def quote(name):
+        if db_type.lower() == "mysql":
+            return "`" + str(name).replace("`", "``") + "`"
+        return '"' + str(name).replace('"', '""') + '"'
+
+    for table_key, table_info in schema.items():
+        schema_name = table_info.get("schema")
+        table_name = table_info.get("table_name", table_key)
+
+        if schema_name:
+            table_ref = f"{quote(schema_name)}.{quote(table_name)}"
+        else:
+            table_ref = quote(table_name)
+
         description += f"\nTable: {table_name}\n"
-        for col in table_info["columns"]:
-            description += f"  - {col['name']} ({col['type']})\n"
-        if table_info.get("foreign_keys"):
-            for fk in table_info["foreign_keys"]:
-                description += f"  - {fk['column']} references {fk['references_table']}\n"
+        description += f"Schema: {schema_name or 'Default'}\n"
+        description += f"SQL Reference: {table_ref}\n"
+
+        for col in table_info.get("columns", []):
+            column_name = col["name"]
+            description += (
+            f"  - {column_name} ({col['type']}) "
+            f"[SQL name: {quote(column_name)}]\n"
+        )
+
+        if table_info.get("primary_keys"):
+            description += f"Primary Keys: {table_info['primary_keys']}\n"
+
+        for fk in table_info.get("foreign_keys", []):
+            columns = fk.get("column", fk.get("constrained_columns", []))
+            ref_table = fk.get("references_table", fk.get("referred_table"))
+            ref_schema = fk.get("references_schema")
+            ref_columns = fk.get("references_columns", fk.get("referred_columns", []))
+
+            if ref_table:
+                ref = (
+                    f"{quote(ref_schema)}.{quote(ref_table)}"
+                    if ref_schema else quote(ref_table)
+                )
+                description += (
+                    f"Foreign Key: {columns} references "
+                    f"{ref} columns {ref_columns}\n"
+                )
+
     return description
 
 
@@ -228,12 +254,16 @@ DATABASE SCHEMA:
 
 STRICT RULES:
 1. ONLY write SELECT queries — NEVER write DROP, DELETE, UPDATE, INSERT
-2. Always use table aliases for clarity (e.g., o for orders)
-3. Handle NULL values properly using COALESCE or IS NOT NULL
-4. For date filtering use proper SQL date functions
-5. Always add LIMIT 1000 if no limit is specified
-6. Return ONLY the SQL query — no explanation needed
-7. Put the SQL inside ```sql ``` code blocks
+2. Use ONLY tables and columns present in the discovered schema.
+3. Never invent table names, column names, or relationships.
+4. Preserve exact table and column names, including capitalization.
+5. Use the exact SQL Reference provided for each table.
+6. Use only discovered foreign-key relationships when joining tables.
+7. Always use table aliases for clarity.
+8. Handle NULL values properly when required.
+9. Use SQL syntax compatible with the selected database type.
+10. Always add LIMIT 1000 if no limit is specified.
+11. Return ONLY the SQL query inside a ```sql code block.
 
 {history_text}
 
@@ -246,7 +276,7 @@ SQL Query:"""
         """
         Step 1: Convert English question to SQL using GPT.
         """
-        schema_desc = get_schema_description(schema)
+        schema_desc = get_schema_description(schema, db_type)
         prompt      = self.build_sql_prompt(schema_desc, question, history, db_type)
 
         response = self.llm.invoke(prompt)

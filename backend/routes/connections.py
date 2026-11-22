@@ -38,46 +38,103 @@ def build_connection_url(data: ConnectionRequest) -> str:
         raise HTTPException(status_code=400, detail=f"Unsupported database type: {data.db_type}")
 
 
+
 def scan_database_schema(connection_url: str) -> dict:
     """
-    Scaning the connected database and extract schema information.
+    Dynamically discover schemas, tables, columns,
+    primary keys and foreign keys across supported databases.
     """
-    engine    = create_engine(connection_url)
-    inspector = inspect(engine)
-    schema    = {}
 
-    table_names = inspector.get_table_names()
+    engine = create_engine(connection_url)
 
-    for table_name in table_names:
-        columns = []
-        # Get all columns for table
-        for col in inspector.get_columns(table_name):
-            columns.append({
-                "name"    : col["name"],
-                "type"    : str(col["type"]),
-                "nullable": col.get("nullable", True)
-            })
+    try:
+        inspector = inspect(engine)
+        db_type = engine.dialect.name
 
-        # primary keys
-        pk = inspector.get_pk_constraint(table_name)
+        schema = {}
 
-        # foreign keys
-        fks = inspector.get_foreign_keys(table_name)
-
-        schema[table_name] = {
-            "columns"      : columns,
-            "primary_keys" : pk.get("constrained_columns", []),
-            "foreign_keys" : [
-                {
-                    "column"          : fk["constrained_columns"],
-                    "references_table": fk["referred_table"]
-                }
-                for fk in fks
-            ]
+        # System schemas that should not be scanned.
+        system_schemas = {
+            "postgresql": {"pg_catalog", "information_schema"},
+            "mysql": {
+                "information_schema",
+                "mysql",
+                "performance_schema",
+                "sys"
+            },
+            "sqlite": {"temp"}
         }
 
-    engine.dispose()   
-    return schema
+        excluded_schemas = system_schemas.get(db_type, set())
+
+        # Discover schemas dynamically.
+        schemas = inspector.get_schema_names()
+
+        for schema_name in schemas:
+
+            if schema_name.lower() in excluded_schemas:
+                continue
+
+            # Discover tables inside each schema.
+            table_names = inspector.get_table_names(
+                schema=schema_name
+            )
+
+            for table_name in table_names:
+
+                columns = []
+
+                # Discover columns.
+                for col in inspector.get_columns(
+                    table_name,
+                    schema=schema_name
+                ):
+                    columns.append({
+                        "name": col["name"],
+                        "type": str(col["type"]),
+                        "nullable": col.get("nullable", True)
+                    })
+
+                # Discover primary keys.
+                pk = inspector.get_pk_constraint(
+                    table_name,
+                    schema=schema_name
+                )
+
+                # Discover foreign keys.
+                fks = inspector.get_foreign_keys(
+                    table_name,
+                    schema=schema_name
+                )
+
+                foreign_keys = []
+
+                for fk in fks:
+                    foreign_keys.append({
+                        "column": fk.get("constrained_columns", []),
+                        "references_schema": fk.get("referred_schema"),
+                        "references_table": fk.get("referred_table"),
+                        "references_columns": fk.get("referred_columns", [])
+                    })
+
+                # Preserve exact schema and table names.
+                qualified_name = f"{schema_name}.{table_name}"
+
+                schema[qualified_name] = {
+                    "schema": schema_name,
+                    "table_name": table_name,
+                    "columns": columns,
+                    "primary_keys": pk.get(
+                        "constrained_columns", []
+                    ),
+                    "foreign_keys": foreign_keys
+                }
+
+        return schema
+
+    finally:
+        engine.dispose()
+
 
 
 @router.post("/add")
