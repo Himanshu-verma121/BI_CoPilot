@@ -108,103 +108,136 @@ def is_safe_sql(sql: str) -> bool:
 
 
 def select_chart_type(df: pd.DataFrame, question: str) -> str:
-    """
-    Automatically select the best chart type based on:
-    1. The data structure (columns, types)
-    2. The question asked
+    """Choose a chart from an explicit request first, then the result structure."""
+    q = question.lower()
+    cols = df.columns.tolist()
+    numeric_cols = df.select_dtypes(include="number").columns.tolist()
+    rows = len(df)
 
-    Rules:
-    - Time/date column + numeric = LINE chart (trends over time)
-    - Category + numeric + few rows = BAR chart (comparisons)
-    - Two numeric columns = SCATTER chart (correlation)
-    - One column with percentages = PIE chart (proportions)
-    - Many rows = TABLE (too much data for chart)
-    """
-    question_lower = question.lower()
-    columns        = df.columns.tolist()
-    num_rows       = len(df)
+    # Respect an explicitly requested visualization before using heuristics.
+    requested = [
+        (("donut", "doughnut"), "donut"),
+        (("pie chart", "pie graph"), "pie"),
+        (("treemap", "tree map"), "treemap"),
+        (("sunburst",), "sunburst"),
+        (("histogram",), "histogram"),
+        (("box plot", "boxplot"), "box"),
+        (("violin plot", "violin"), "violin"),
+        (("heatmap", "heat map", "correlation matrix"), "heatmap"),
+        (("funnel",), "funnel"),
+        (("waterfall",), "waterfall"),
+        (("radar", "spider chart"), "radar"),
+        (("bubble chart", "bubble plot"), "bubble"),
+        (("scatter",), "scatter"),
+        (("area chart", "area graph", "stacked area"), "area"),
+        (("stacked bar", "stacked column"), "stacked_bar"),
+        (("grouped bar", "clustered bar", "grouped column"), "grouped_bar"),
+        (("bar chart", "bar graph", "column chart"), "bar"),
+        (("line chart", "line graph"), "line"),
+    ]
+    for phrases, chart in requested:
+        if any(phrase in q for phrase in phrases):
+            return chart
 
-    # Check for
-    
-    # time-based columns
-    time_keywords = ["date", "month", "year", "week", "time", "day"]
-    has_time = any(
-        any(kw in col.lower() for kw in time_keywords)
-        for col in columns
-    )
-
-    # Percentage questions
-    proportion_keywords = ["percentage", "share", "proportion", "distribution", "%"]
-    is_proportion = any(kw in question_lower for kw in proportion_keywords)
-
-    # Trend questions
-    trend_keywords = ["trend", "over time", "monthly", "weekly", "growth"]
-    is_trend = any(kw in question_lower for kw in trend_keywords)
-
-    # Decision logic
-    if is_proportion and num_rows <= 10:
-        return "pie"
-    elif has_time or is_trend:
+    time_words = ("date", "month", "year", "week", "time", "day")
+    has_time = any(any(word in str(c).lower() for word in time_words) for c in cols)
+    if any(word in q for word in ("trend", "over time", "monthly", "weekly", "growth")) or has_time:
         return "line"
-    elif num_rows <= 20:
-        return "bar"
-    elif num_rows > 100:
-        return "table"    # too many rows for chart
-    else:
-        return "bar"      # default
+    if any(word in q for word in ("percentage", "proportion", "share", "distribution")) and rows <= 10:
+        return "pie"
+    if len(numeric_cols) >= 2:
+        return "scatter"
+    if rows > 100:
+        return "table"
+    return "bar"
 
 
 def create_chart(df: pd.DataFrame, chart_type: str, question: str) -> dict:
-    """
-    Create Plotly chart from dataframe.
-
-    """
-    columns = df.columns.tolist()
-
-    # Need at least 2 columns for most charts
-    if len(columns) < 2:
+    """Build a Plotly figure from query results without assuming fixed column names."""
+    if df.empty or len(df.columns) < 2:
         return None
 
-    x_col = columns[0]   
-    y_col = columns[1]   
+    cols = df.columns.tolist()
+    numeric_cols = df.select_dtypes(include="number").columns.tolist()
+    x_col = cols[0]
+    y_col = numeric_cols[0] if numeric_cols else cols[1]
+    color_col = cols[2] if len(cols) > 2 else None
+    title = question[:80]
+    palette = ["#667eea", "#22c55e", "#f59e0b", "#ec4899", "#06b6d4"]
+
     try:
-        if chart_type == "bar":
-            fig = px.bar(
-                df, x=x_col, y=y_col,
-                title=question[:60],
-                color_discrete_sequence=["#667eea"]
-            )
+        if chart_type in ("pie", "donut"):
+            fig = px.pie(df, names=x_col, values=y_col, title=title,
+                         hole=0.48 if chart_type == "donut" else 0)
+        elif chart_type == "bar":
+            fig = px.bar(df, x=x_col, y=y_col, title=title, color_discrete_sequence=palette)
+        elif chart_type in ("grouped_bar", "stacked_bar"):
+            if not color_col:
+                return px.bar(df, x=x_col, y=y_col, title=title, color_discrete_sequence=palette).to_dict()
+            fig = px.bar(df, x=x_col, y=y_col, color=color_col, title=title,
+                         barmode="group" if chart_type == "grouped_bar" else "stack")
         elif chart_type == "line":
-            fig = px.line(
-                df, x=x_col, y=y_col,
-                title=question[:60],
-                markers=True,
-                color_discrete_sequence=["#667eea"]
-            )
-        elif chart_type == "pie":
-            fig = px.pie(
-                df, names=x_col, values=y_col,
-                title=question[:60]
-            )
-        elif chart_type == "scatter":
-            fig = px.scatter(
-                df, x=x_col, y=y_col,
-                title=question[:60],
-                color_discrete_sequence=["#667eea"]
-            )
+            fig = px.line(df, x=x_col, y=y_col, color=color_col, title=title, markers=True)
+        elif chart_type == "area":
+            fig = px.area(df, x=x_col, y=y_col, color=color_col, title=title)
+        elif chart_type in ("scatter", "bubble"):
+            size_col = numeric_cols[1] if chart_type == "bubble" and len(numeric_cols) > 1 else None
+            fig = px.scatter(df, x=x_col, y=y_col, size=size_col, color=color_col,
+                             title=title, size_max=55)
+        elif chart_type == "histogram":
+            target = numeric_cols[0] if numeric_cols else y_col
+            fig = px.histogram(df, x=target, title=title, color=color_col)
+        elif chart_type in ("box", "violin"):
+            target = numeric_cols[0] if numeric_cols else y_col
+            fig = (px.box(df, x=x_col, y=target, color=color_col, title=title)
+                   if x_col != target else px.box(df, y=target, title=title))
+            if chart_type == "violin":
+                fig = (px.violin(df, x=x_col, y=target, color=color_col, box=True, title=title)
+                       if x_col != target else px.violin(df, y=target, box=True, title=title))
+        elif chart_type == "heatmap":
+            if len(cols) >= 3:
+                fig = px.density_heatmap(df, x=cols[0], y=cols[1], z=y_col,
+                                         title=title, color_continuous_scale="Viridis")
+            else:
+                matrix = df[numeric_cols].corr() if len(numeric_cols) >= 2 else df.select_dtypes(include="number")
+                if matrix.empty:
+                    return None
+                fig = px.imshow(matrix, text_auto=True, aspect="auto", title=title,
+                                color_continuous_scale="Viridis")
+        elif chart_type == "treemap":
+            path_cols = [c for c in cols if c != y_col][:2]
+            fig = px.treemap(df, path=path_cols, values=y_col, title=title)
+        elif chart_type == "sunburst":
+            path_cols = [c for c in cols if c != y_col][:3]
+            fig = px.sunburst(df, path=path_cols, values=y_col, title=title)
+        elif chart_type == "funnel":
+            fig = px.funnel(df, x=y_col, y=x_col, title=title)
+        elif chart_type == "waterfall":
+            import plotly.graph_objects as go
+            fig = go.Figure(go.Waterfall(x=df[x_col].astype(str), y=df[y_col], name=y_col))
+            fig.update_layout(title=title)
+        elif chart_type == "radar":
+            if len(numeric_cols) < 3:
+                return None
+            import plotly.graph_objects as go
+            categories = numeric_cols
+            values = df[categories].iloc[0].tolist()
+            fig = go.Figure(go.Scatterpolar(r=values + values[:1],
+                                            theta=categories + categories[:1],
+                                            fill="toself", name=str(df.iloc[0][x_col])))
+            fig.update_layout(title=title, polar=dict(radialaxis=dict(visible=True)))
         else:
             return None
 
         fig.update_layout(
-            paper_bgcolor = "rgba(0,0,0,0)",
-            plot_bgcolor  = "rgba(0,0,0,0)",
-            font          = dict(family="Arial"),
-            margin        = dict(l=20, r=20, t=40, b=20)
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(family="Arial"),
+            margin=dict(l=30, r=20, t=50, b=35)
         )
-
         return json.loads(fig.to_json())
-
-    except Exception:
+    except Exception as e:
+        print(f"Chart generation failed ({chart_type}): {e}")
         return None
 
 
